@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Random sequence generator</title>
+<title>Random tiling generator</title>
 <style>
 .form-group {
   display: flex;
@@ -23,7 +23,7 @@
 .form-container {
   width: 300px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px 20px;
   border: 1px solid #ccc;
   border-radius: 5px;
   background-color: #f9f9f9;
@@ -40,110 +40,107 @@
 <body>
 <div class="form-container">
   <form>
-    <div class="form-group">
-      <label for="numletters">Number of letters (1-26):</label>
-      <input type="text" id="numletters" name="numletters" value="3">
-    </div>
-    <div class="form-group">
+    <p class="form-group">
+      <label for="numletters">Number of letters (2-26):</label>
+      <input type="number" required min="2" max="26" id="numletters" name="numletters" value="3">
+    </p>
+    <p class="form-group">
       <label for="maxcluster">Max cluster size (1-1000):</label>
-      <input type="text" id="maxcluster" name="maxcluster" value="1">
-    </div>
-    <div class="form-group">
-      <label for="seqlen">Sequence length (1-1000):</label>
-      <input type="text" id="seqlen" name="seqlen" value="10">
-    </div>
-    <div class="form-group">
-      <input type="button" value="Generate" onclick="onClick()">
-    </div>
+      <input type="number" required min="1" max="1000" id="maxcluster" name="maxcluster" value="1">
+    </p>
+    <p class="form-group">
+      <label for="seqlen">Sequence length (2-1000):</label>
+      <input type="number" min="2" max="1000" id="seqlen" name="seqlen" value="10">
+    </p>
+    <p class="form-group">
+      <input type="button" id="generate" value="Generate">
+    </p>
   </form>
 </div>
 <p id="output"></p>
 <script>
-function onClick() {
-  const numDistinctLetters = parseInt(document.getElementById('numletters').value)
-  const maxRunLength = parseInt(document.getElementById('maxcluster').value)
-  const sequenceLength = parseInt(document.getElementById('seqlen').value)
-  const sequence = generateRandomSequence(numDistinctLetters, maxRunLength, sequenceLength)
-  document.getElementById('output').innerHTML = sequence.split('').join(' ')
-}
+const numlettersInput = document.querySelector('#numletters')
+const maxclusterInput = document.querySelector('#maxcluster')
+const seqlenInput = document.querySelector('#seqlen')
+const outputElement = document.querySelector('#output')
+document.querySelector('#generate').addEventListener('click', (e) => {
+  const numDistinctLetters = parseInt(numlettersInput.value)
+  const maxRunLength = parseInt(maxclusterInput.value)
+  const sequenceLength = parseInt(seqlenInput.value)
+  const tiling = generateRandomTiling(numDistinctLetters, maxRunLength, sequenceLength)
+  outputElement.textContent = tiling.join(' ')
+})
 
-function generateRandomSequence(numDistinctLetters, maxRunLength, sequenceLength) {
-  // Validate inputs
+function generateRandomTiling(numDistinctLetters, maxRunLength, sequenceLength) {
+  // Validate inputs.
   if (numDistinctLetters < 2 || numDistinctLetters > 26) {
     throw new Error('Number of distinct letters must be between 2 and 26')
   }
   if (maxRunLength < 1) {
     throw new Error('Maximum run length must be at least 1')
   }
-  if (sequenceLength < 1) {
-    throw new Error('Sequence length must be at least 1')
+  if (sequenceLength < 2) {
+    throw new Error('Sequence length must be at least 2')
   }
   if (sequenceLength < numDistinctLetters) {
     throw new Error('Sequence length must be at least number of distinct letters')
   }
 
-  // Generate the list of letters
+  // Generate the list of letters in a random order.
   const letters = shuffleArray(
-    Array.from({ length: sequenceLength },
-     (_, i) => String.fromCharCode(65 + i % numDistinctLetters)))
-  // Initialize the sequence
-  let result = ''
+    Array.from({ length: sequenceLength }, (_, i) => String.fromCharCode(65 + i % numDistinctLetters)))
+  // Iterate through the array to look for runs that are too long.
   let lastLetter = ''
   let runLength = 0
-
-  // While we haven't reached the desired sequence length
-  for (let i = 0; result.length < sequenceLength; i++) {
+  for (let i = 0; i < letters.length; i++) {
     let currentLetter = letters[i]
-    if (currentLetter === lastLetter && runLength === maxRunLength) {
+    // If this run exceeds the maximum length then swap out the letter.
+    if (currentLetter === lastLetter && runLength >= maxRunLength) {
       let replacement = currentLetter
+      // Search ahead for a different letter.
       for (let j = i + 1; j < letters.length; j++) {
         if (letters[j] !== currentLetter) {
           replacement = letters[j]
           letters[j] = currentLetter
-          letters[i] = replacement
           break
         }
       }
+      // If none was found then start from the beginning and search for a
+      // letter to swap.
       if (replacement === currentLetter) {
         for (let j = 0; j < i; j++) {
-          if ((j === 0 || result[j-1] !== currentLetter)
-            && result[j] !== currentLetter
-            && result[j+1] !== currentLetter) {
-            replacement = result[j]
-            result[j] = currentLetter
-            currentLetter = replacement
+          if ((j === 0 || letters[j-1] !== currentLetter)
+            && letters[j] !== currentLetter
+            && letters[j+1] !== currentLetter) {
+            replacement = letters[j]
+            letters[j] = currentLetter
             break
           }
         }
       }
       currentLetter = replacement
+      letters[i] = currentLetter
     }
-
-    // Add the selected letter to the result
-    result += currentLetter
-
-    // Update the last letter and run length
+    // Update the last letter and run length.
     if (currentLetter === lastLetter) {
       runLength++
     } else {
       lastLetter = currentLetter
-      runLength = 1 // Reset run length for the new letter
+      runLength = 1 // Reset run length for the new letter.
     }
   }
-  return result
+  return letters
 }
 
-function shuffleArray(array) {
-  // Create a copy of the array to avoid mutating the original
-  const shuffledArray = [...array]
-  // Iterate over the array from the last to the first element
-  for (let i = shuffledArray.length - 1; i > 0; i--) {
-    // Generate a random index from 0 to i
+function shuffleArray(arr) {
+  // Iterate over the array from the last to the first element.
+  for (let i = arr.length - 1; i > 0; i--) {
+    // Generate a random index from 0 to i.
     const randomIndex = Math.floor(Math.random() * (i + 1))
-    // Swap the elements at the current index and the random index
-    ;[shuffledArray[i], shuffledArray[randomIndex]] = [shuffledArray[randomIndex], shuffledArray[i]]
+    // Swap the elements at the current index and the random index.
+    ;[arr[i], arr[randomIndex]] = [arr[randomIndex], arr[i]]
   }
-  return shuffledArray
+  return arr
 }
 </script>
 </body>
